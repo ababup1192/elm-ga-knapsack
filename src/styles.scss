@@ -64,6 +64,7 @@ article.boxs {
   .box-with-label {
     display: flex;
     flex-direction: column;
+    text-align: center;
   }
 }
 
@@ -82,5 +83,6 @@ article.genes {
   .gene-with-label {
     display: flex;
     flex-direction: column;
+    text-align: center;
   }
 }
