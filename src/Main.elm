@@ -1,4 +1,4 @@
-port module Main exposing (Model, Msg(..), init, main, toJs, update, view)
+module Main exposing (Model, Msg(..), init, main, update, view)
 
 import Browser
 import Browser.Navigation as Nav
@@ -7,15 +7,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http exposing (Error(..))
 import Json.Decode as Decode
-
-
-
--- ---------------------------
--- PORTS
--- ---------------------------
-
-
-port toJs : String -> Cmd msg
+import Random exposing (Generator)
 
 
 
@@ -24,23 +16,77 @@ port toJs : String -> Cmd msg
 -- ---------------------------
 
 
+type alias Gene =
+    List Bool
+
+
+type alias Goods =
+    { weight : Int, value : Int }
+
+
 type alias Model =
     { capacity : Int
-    , goodsWait : Int
-    , goodsValue : Int
+    , maxGoodsWeight : Int
+    , maxGoodsValue : Int
     , numOfGene : Int
+    , goodsList : List Goods
+    , geneList : List Gene
     }
+
+
+numOfGoods =
+    50
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { capacity = 500
-      , goodsWait = 20
-      , goodsValue = 10
+      , maxGoodsWeight = 20
+      , maxGoodsValue = 10
       , numOfGene = 20
+      , goodsList = []
+      , geneList = []
       }
-    , Cmd.none
+    , Cmd.batch
+        [ Random.generate GenerateGoodsList <| generateGoodsList 20 10
+        , Random.generate GenerateGeneList <| generateGeneList 20
+        ]
     )
+
+
+generateGoods : Int -> Int -> Generator Goods
+generateGoods maxGoodsWeight maxGoodsValue =
+    Random.map2
+        Goods
+        (Random.int 1 maxGoodsWeight)
+        (Random.int 1 maxGoodsValue)
+
+
+generateGoodsList : Int -> Int -> Generator (List Goods)
+generateGoodsList maxGoodsweight maxGoodsValue =
+    Random.list numOfGoods <| generateGoods maxGoodsweight maxGoodsValue
+
+
+generateGene : Random.Generator Gene
+generateGene =
+    Random.list numOfGoods (Random.int 0 1 |> Random.map (\n -> n == 1))
+
+
+generateGeneList : Int -> Generator (List Gene)
+generateGeneList numOfGene =
+    Random.list numOfGene generateGene
+
+
+sumOfGoodsList : List Goods -> Gene -> Goods
+sumOfGoodsList goodsList gene =
+    List.map2 Tuple.pair goodsList gene
+        |> List.filter Tuple.second
+        |> List.map Tuple.first
+        |> List.foldl
+            (\{ weight, value } goods ->
+                Goods (weight + goods.weight) (value + goods.value)
+            )
+            (Goods 0 0)
 
 
 
@@ -50,12 +96,18 @@ init _ =
 
 
 type Msg
-    = NoOp
+    = GenerateGoodsList (List Goods)
+    | GenerateGeneList (List Gene)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    ( model, Cmd.none )
+    case msg of
+        GenerateGoodsList goodsList ->
+            ( { model | goodsList = goodsList }, Cmd.none )
+
+        GenerateGeneList geneList ->
+            ( { model | geneList = geneList }, Cmd.none )
 
 
 
@@ -65,7 +117,7 @@ update msg model =
 
 
 view : Model -> Html Msg
-view ({ capacity, goodsWait, goodsValue, numOfGene } as model) =
+view ({ capacity, maxGoodsWeight, maxGoodsValue, numOfGene, goodsList, geneList } as model) =
     section []
         [ article [ class "initial-settings" ]
             [ article []
@@ -84,11 +136,11 @@ view ({ capacity, goodsWait, goodsValue, numOfGene } as model) =
                     , article [ class "pure-form" ]
                         [ article []
                             [ label [] [ text "重さ" ]
-                            , input [ type_ "number", value <| String.fromInt goodsWait, readonly True ] []
+                            , input [ type_ "number", value <| String.fromInt maxGoodsWeight, readonly True ] []
                             ]
                         , article []
                             [ label [] [ text "価値" ]
-                            , input [ type_ "number", value <| String.fromInt goodsValue, readonly True ] []
+                            , input [ type_ "number", value <| String.fromInt maxGoodsValue, readonly True ] []
                             ]
                         ]
                     , article [ class "gene-setting pure-form" ]
@@ -107,19 +159,31 @@ view ({ capacity, goodsWait, goodsValue, numOfGene } as model) =
                 , button [ class "pure-button pure-button-primary" ] [ text "次の世代へ" ]
                 ]
             , article [ class "boxs" ] <|
-                List.repeat 50
-                    (article [ class "box-with-label" ]
-                        [ img [ src "/images/box.svg", width 60, height 60 ] []
-                        , label [] [ text "w2v5" ]
-                        ]
-                    )
+                (goodsList
+                    |> List.map
+                        (\{ weight, value } ->
+                            article [ class "box-with-label" ]
+                                [ img [ src "/images/box.svg", width 60, height 60 ] []
+                                , label [] [ text <| "w" ++ String.fromInt weight ]
+                                , label [] [ text <| "v" ++ String.fromInt value ]
+                                ]
+                        )
+                )
             , article [ class "genes" ] <|
-                List.repeat 20
-                    (article [ class "gene-with-label" ]
-                        [ img [ src "/images/black-knapsack.svg", width 60, height 60 ] []
-                        , label [] [ text "w2v5" ]
-                        ]
-                    )
+                (geneList
+                    |> List.map
+                        (\gene ->
+                            let
+                                { weight, value } =
+                                    sumOfGoodsList goodsList gene
+                            in
+                            article [ class "gene-with-label" ]
+                                [ img [ src "/images/black-knapsack.svg", width 60, height 60 ] []
+                                , label [] [ text <| "w" ++ String.fromInt weight ]
+                                , label [] [ text <| "v" ++ String.fromInt value ]
+                                ]
+                        )
+                )
             ]
         ]
 
