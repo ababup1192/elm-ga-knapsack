@@ -1,4 +1,4 @@
-port module Main exposing (Model, Msg(..), add1, init, main, toJs, update, view)
+port module Main exposing (Model, Msg(..), init, main, toJs, update, view)
 
 import Browser
 import Browser.Navigation as Nav
@@ -25,14 +25,22 @@ port toJs : String -> Cmd msg
 
 
 type alias Model =
-    { counter : Int
-    , serverMessage : String
+    { capacity : Int
+    , goodsWait : Int
+    , goodsValue : Int
+    , numOfGene : Int
     }
 
 
-init : Int -> ( Model, Cmd Msg )
-init flags =
-    ( { counter = flags, serverMessage = "" }, Cmd.none )
+init : () -> ( Model, Cmd Msg )
+init _ =
+    ( { capacity = 500
+      , goodsWait = 20
+      , goodsValue = 10
+      , numOfGene = 20
+      }
+    , Cmd.none
+    )
 
 
 
@@ -42,77 +50,22 @@ init flags =
 
 
 type Msg
-    = Inc
-    | Set Int
-    | TestServer
-    | OnServerResponse (Result Http.Error String)
+    = NoOp
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update message model =
-    case message of
-        Inc ->
-            ( add1 model, toJs "Hello Js" )
-
-        Set m ->
-            ( { model | counter = m }, toJs "Hello Js" )
-
-        TestServer ->
-            let
-                expect =
-                    Http.expectJson OnServerResponse (Decode.field "result" Decode.string)
-            in
-            ( model
-            , Http.get { url = "/test", expect = expect }
-            )
-
-        OnServerResponse res ->
-            case res of
-                Ok r ->
-                    ( { model | serverMessage = r }, Cmd.none )
-
-                Err err ->
-                    ( { model | serverMessage = "Error: " ++ httpErrorToString err }, Cmd.none )
-
-
-httpErrorToString : Http.Error -> String
-httpErrorToString err =
-    case err of
-        BadUrl _ ->
-            "BadUrl"
-
-        Timeout ->
-            "Timeout"
-
-        NetworkError ->
-            "NetworkError"
-
-        BadStatus _ ->
-            "BadStatus"
-
-        BadBody s ->
-            "BadBody: " ++ s
-
-
-{-| increments the counter
-
-    add1 5 --> 6
-
--}
-add1 : Model -> Model
-add1 model =
-    { model | counter = model.counter + 1 }
+update msg model =
+    ( model, Cmd.none )
 
 
 
 -- ---------------------------
 -- VIEW
 -- ---------------------------
--- img [ src "/images/logo.png" ] []
 
 
 view : Model -> Html Msg
-view model =
+view ({ capacity, goodsWait, goodsValue, numOfGene } as model) =
     section []
         [ article [ class "initial-settings" ]
             [ article []
@@ -123,7 +76,7 @@ view model =
                     [ img [ src "/images/knapsack.svg" ] []
                     , article []
                         [ label [] [ text "容量" ]
-                        , input [ type_ "number", value "500", readonly True ] []
+                        , input [ type_ "number", value <| String.fromInt capacity, readonly True ] []
                         ]
                     ]
                 , article [ class "box-setting" ]
@@ -131,18 +84,18 @@ view model =
                     , article [ class "pure-form" ]
                         [ article []
                             [ label [] [ text "重さ" ]
-                            , input [ type_ "number", value "20", readonly True ] []
+                            , input [ type_ "number", value <| String.fromInt goodsWait, readonly True ] []
                             ]
                         , article []
                             [ label [] [ text "価値" ]
-                            , input [ type_ "number", value "10", readonly True ] []
+                            , input [ type_ "number", value <| String.fromInt goodsValue, readonly True ] []
                             ]
                         ]
                     , article [ class "gene-setting pure-form" ]
                         [ img [ src "/images/gene.svg" ] []
                         , article []
                             [ label [] [ text "遺伝子数" ]
-                            , input [ type_ "number", value "20", readonly True ] []
+                            , input [ type_ "number", value <| String.fromInt numOfGene, readonly True ] []
                             ]
                         ]
                     ]
@@ -177,14 +130,14 @@ view model =
 -- ---------------------------
 
 
-main : Program Int Model Msg
+main : Program () Model Msg
 main =
     Browser.document
         { init = init
         , update = update
         , view =
             \m ->
-                { title = "Elm 0.19 starter"
+                { title = "Knapsack GA"
                 , body = [ view m ]
                 }
         , subscriptions = \_ -> Sub.none
